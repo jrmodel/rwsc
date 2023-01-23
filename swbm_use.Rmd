@@ -284,10 +284,10 @@ params_modl <- list(
   )
 
 # run the model for these parameters
+# for a single site
 output <- runread_pmodel_f(
   df_drivers2 |> 
-    ungroup() |> 
-    slice(1),
+    filter(sitename == "AT-Neu"),
   par = params_modl
   )
 ```
@@ -297,8 +297,7 @@ output <- runread_pmodel_f(
 Plot modelled and observed net radiation
 ```{r}
 df_drivers2 |> 
-  ungroup() |> 
-  slice(1) |> 
+  filter(sitename == "AT-Neu") |> 
   unnest(forcing) |> 
   select(date, netrad_obs = netrad) |> 
   left_join(
@@ -383,14 +382,12 @@ Run calibration.
 ```{r}
 pars <- calib_sofun(
     drivers = df_drivers2 |> 
-                ungroup() |> 
-                slice(1),  
+      filter(sitename == "AT-Neu"),  
     obs = df_obs |> 
       mutate(le = le*24*60*60) |> 
       group_by(sitename) |> 
       nest() |> 
-      ungroup() |> 
-      slice(1),
+      filter(sitename == "AT-Neu"),
     settings = settings
   )
 ```
@@ -411,8 +408,7 @@ params_modl <- list(
 # run the model for these parameters
 output <- runread_pmodel_f(
   df_drivers2 |> 
-    ungroup() |> 
-    slice(1),
+    filter(sitename == "AT-Neu"),
   par = params_modl
   )
 ```
