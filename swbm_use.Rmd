@@ -133,7 +133,9 @@ df_missing |>
 
 ## SWBM in rsofun
 
-The Simple Water Bucket Model by Orth et al. (2013) is implemented in rsofun and uses net radiation as a forcing (as opposed to SPLASH, where it is calculated as a function of (prescribed) solar radiation, temperature, and cloud cover).
+The Simple Water Bucket Model by Orth et al. (2013) is implemented in rsofun and uses net radiation as a forcing (as opposed to SPLASH, where it is calculated as a function of (prescribed) solar radiation, temperature, and cloud cover). 
+
+To use it, check out rsofun branch `rwsc` and compile it.
 
 ### Simulation parameters
 
