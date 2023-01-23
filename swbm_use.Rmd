@@ -1,0 +1,436 @@
+---
+title: "SWBM usage"
+author: "Beni Stocker"
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+
+library(rsofun)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(recipes)
+library(FluxDataKit)
+library(readr)
+library(stringr)
+
+source("R/fill_missing_netrad.R")
+
+# fake variable as optimization isn't used
+pars <- list()
+pars$par["kphio"] <- 0.05
+```
+
+## Net radiation as forcing
+
+### Read data
+
+Check whether sufficient sites have net radiation data.
+```{r}
+filnam <- "./data/df_fluxnet.rds"
+if (!file.exists(filnam)){
+  df_fluxnet <- ingest(
+    siteinfo  = ingestr::siteinfo_fluxnet2015,
+    source    = "fluxnet",
+    getvars   = list(
+      netrad = "NETRAD",
+      ppfd = "SW_IN_F",
+      temp = "TA_F_DAY"
+      ),
+    dir       = "~/data/FLUXNET-2015_Tier1/20191024/DD/",
+    timescale = "d",
+    settings  = list(
+      getswc = TRUE,
+      threshold_NETRAD = 0.8
+      ),
+    )
+  saveRDS(df_fluxnet, file = filnam)
+} else {
+  df_fluxnet <- readRDS(filnam)
+}
+```
+
+Missing data across all sites.
+```{r}
+df_fluxnet |> 
+  tidyr::unnest(data) |> 
+  select(netrad) |> 
+  visdat::vis_miss(warn_large_data = FALSE, cluster = FALSE)
+```
+
+Get fraction of missing data per site.
+```{r}
+calc_f_missing <- function(df, varnam){
+  vec <- df |> 
+    pull(!!varnam)
+  (sum(is.na(vec)) / nrow(df))
+}
+
+df_missing <- df_fluxnet |> 
+  mutate(f_missing = purrr::map_dbl(data, ~calc_f_missing(., "netrad")))
+```
+
+Distribution of missing data.
+```{r}
+df_missing |> 
+  ggplot(aes(x = f_missing, y = ..count..)) +
+  geom_histogram()
+```
+
+### Site selection
+
+Available sites with maximum 10% missing.
+```{r}
+df_sites <- df_missing |> 
+  select(-data) |> 
+  filter(f_missing <= 0.1) |> 
+  arrange(desc(f_missing)) |> 
+  left_join(
+    ingestr::siteinfo_fluxnet2015,
+    by = "sitename"
+  ) |> 
+  filter(classid != "CRO") |> 
+  mutate(nyears = as.numeric(year_end) - as.numeric(year_start) + 1)
+```
+
+Selecting 17 (to have enough to start with):
+
+```{r}
+df_sites <- df_sites |> 
+  filter(sitename %in% c("FR-LBr", "FR-Pue", "US-Ton", "US-NR1", "NL-Loo", "US-MMS", "US-Wkg", "AT-Neu", "AU-DaS", "DE-Tha", "GF-Guy", "US-NR1", "US-UMB", "AU-Tum", "US-Me2", "DE-Hai", "US-SRM"))
+```
+
+### Fill missing data
+
+Fill missing data using KNN.
+```{r}
+df_fluxnet_filled <- df_fluxnet |> 
+  filter(sitename %in% df_sites$sitename) |> 
+  mutate(data = purrr::map(data, ~fill_missing_netrad(.)))
+```
+
+With filled values.
+```{r}
+df_fluxnet_filled |> 
+  filter(sitename == "FR-Pue") |> 
+  unnest() |>
+  ggplot() +
+  geom_point(aes(date, netrad_filled), color = "red") +
+  geom_point(aes(date, netrad))
+```
+
+Table of missing data
+```{r}
+df_missing |> 
+  select(sitename, f_missing) |> 
+  knitr::kable()
+```
+
+
+## SWBM in rsofun
+
+The Simple Water Bucket Model by Orth et al. (2013) is implemented in rsofun and uses net radiation as a forcing (as opposed to SPLASH, where it is calculated as a function of (prescribed) solar radiation, temperature, and cloud cover). 
+
+To use it, check out rsofun branch `rwsc` and compile it.
+
+### Simulation parameters
+
+By default, net radiation is not read as an input. Change this to net radiation treated as a model forcing.
+
+```{r}
+p_model_drivers$params_siml[[1]]$in_netrad <- TRUE
+```
+
+### Forcing data
+
+Get the FLUXNET 2015 forcing data from sofunCalVal.
+```{r}
+load("~/sofunCalVal/data/df_drivers_fluxnet2015_allsites.rda")  # loads 'df_drivers_fluxnet2015_allsites'
+```
+
+Subset sites.
+```{r}
+df_drivers <- df_drivers_fluxnet2015_allsites |> 
+  filter(sitename %in% df_sites$sitename)
+```
+
+Complement forcing with filled net radiation data.
+
+```{r}
+df_drivers <- df_drivers |> 
+  select(sitename, forcing) |> 
+  unnest(forcing) |> 
+  left_join(
+    df_fluxnet_filled |> 
+      unnest(data) |> 
+      select(date, netrad = netrad_filled),
+    by = c("sitename", "date")
+  ) |> 
+  group_by(sitename) |> 
+  nest() |> 
+  rename(forcing = data) |> 
+  right_join(
+    df_drivers |> 
+      select(-forcing),
+    by = "sitename"
+  )
+```
+
+### Validation data
+
+Adapted from https://github.com/computationales/sofunCalVal/blob/main/analysis/00_prepare_fluxnet_driver_data.R:
+
+Get data from FluxDataKit (downloaded from Zenodo to `~/data/flux_data_kit_beta/fluxes/`)
+```{r}
+filnam <- "./data/df_fdk.rds"
+
+if (!file.exists(filnam)){
+  # # create CSV files with daily data
+  # list_path <- purrr::map(
+  #   as.list(df_sites$sitename),
+  #   ~try(fdk_convert_lsm(
+  #     site = .,
+  #     path = "~/data/flux_data_kit_beta/fluxes",
+  #     fluxnet_format = TRUE,
+  #     out_path = "~/data/flux_data_kit_beta/fluxes_csv"
+  #     )  
+  #   ))
+  # 
+  # # subset to only those for which FDK data is available (12)
+  # paths <- list_path[purrr::map_chr(list_path, ~class(.)) == "character"]
+  
+  paths <- list.files("~/data/flux_data_kit_beta/fluxes_csv", 
+                      pattern = "DD",
+                      full.names = TRUE)
+  
+  # read data and convert to data frame
+  list_fdk <- purrr::map(
+    paths,
+    ~read_csv(.)
+  )
+  names(list_fdk) <- paths
+  df_fdk <- bind_rows(
+    list_fdk,
+    .id = "path"
+    ) |> 
+    mutate(sitename = str_sub(path, start = 63, end = 68))
+  
+  write_rds(df_fdk, file = filnam)
+  
+} else {
+  
+  df_fdk <- readRDS(filnam)
+  
+}
+```
+
+Get LE data and retain only good quality data (50% cutoff leaves enough data)
+```{r}
+df_obs <- df_fdk |> 
+  filter(sitename %in% df_sites$sitename) |> 
+  select(sitename, date = TIMESTAMP, LE_F_MDS, LE_F_MDS_QC) |> 
+  mutate(le = ifelse(LE_F_MDS_QC > 0.5, LE_F_MDS, NA))
+```
+
+Lots of missing data?
+```{r}
+df_missing2 <- df_obs |> 
+  group_by(sitename) |> 
+  nest() |> 
+  mutate(f_missing = purrr::map_dbl(data, ~calc_f_missing(., "le"))) |> 
+  select(-data)
+
+df_missing2 |> 
+  ggplot(aes(x = f_missing, y = ..density..)) +
+  geom_histogram()
+```
+
+### Uncalibrated run
+
+This is now done with an rsofun version where net radiation can be used as a forcing. This is available in branch `rwsc`. Install rsofun from that branch and run it below using default model parameters.
+
+```{r}
+# simulation parameter needs to be re-defined.
+df_drivers$params_siml[[1]]$in_netrad <- TRUE
+
+df_drivers2 <- df_drivers |> 
+  
+  # retain only those for which we have observational data from fdk
+  filter(sitename %in% unique(df_obs$sitename)) |> 
+  
+  rename(params_soil = df_soiltexture,
+         site_info = siteinfo) |> 
+  
+  # add missing variables to forcing (not actually used here)
+  mutate(forcing = purrr::map(forcing, 
+                              ~mutate(., 
+                                      tmin = temp, 
+                                      tmax = temp)))
+
+# use default parameters
+params_modl <- list(
+    kphio           = 0.09423773,
+    soilm_par_a     = 0.33349283,
+    soilm_par_b     = 1.45602286,
+    tau_acclim_tempstress = 10,
+    par_shape_tempstress  = 0.0,
+    exp_et = 0.06,
+    beta_et = 0.66,
+    rwsc = 200
+  )
+
+# run the model for these parameters
+# for a single site
+output <- runread_pmodel_f(
+  df_drivers2 |> 
+    filter(sitename == "AT-Neu"),
+  par = params_modl
+  )
+```
+
+### Plot
+
+Plot modelled and observed net radiation
+```{r}
+df_drivers2 |> 
+  filter(sitename == "AT-Neu") |> 
+  unnest(forcing) |> 
+  select(date, netrad_obs = netrad) |> 
+  left_join(
+    output$data[[1]],
+    by = "date"
+  ) |> 
+  ggplot() +
+  geom_line(aes(date, netrad_obs)) +
+  geom_line(aes(date, netrad/(24*60*60)), color = "red")
+```
+
+Plot modelled PET and AET
+```{r}
+output$data[[1]] |>
+  ggplot() + 
+  geom_line(aes(date, pet), color = "royalblue") +
+  geom_line(aes(date, transp))
+```
+
+Plot observed LE.
+```{r}
+tmp <- df_obs |> 
+  filter(sitename == "AT-Neu") |> 
+  left_join(
+    output$data[[1]],
+    by = "date"
+  ) |> 
+  mutate(latenth = latenth / (24 * 60 * 60) ) |> 
+  left_join(
+    df_fluxnet |> 
+      filter(sitename == "AT-Neu") |> 
+      unnest(data) |> 
+      select(date, starts_with("SWC_")),
+    by = c("sitename", "date")
+  )
+
+out <- tmp |> 
+  rbeni::analyse_modobs2("latenth", "LE_F_MDS")
+out$gg
+
+tmp |> 
+  ggplot() +
+  geom_line(aes(date, latenth), color = "red") +
+  geom_point(aes(date, LE_F_MDS))
+```
+
+Plot soil moisture.
+```{r}
+tmp |> 
+  ggplot() +
+  geom_line(aes(date, wscal), color = "royalblue") +
+  geom_line(aes(date, SWC_F_MDS_1), color = "grey70") +
+  geom_hline(yintercept = 1, linetype = "dotted") +
+  ylim(0, 1.2) 
+```
+
+### Calibrate
+
+Calibratable parameters:
+
+- `exp_et` $\gamma$ in Orth et al., 2013
+- `beta` $\beta_0$ in Orth et al., 2013
+- `rzwsc` $c_s$ in Orth et al., 2013
+
+Specify calibration settings.
+```{r}
+source("R/cost_mae_swbm.R")
+
+settings <- list(
+  method  = "gensa",
+  metric  = cost_mae_swbm,
+  control = list(max.call = 1e3),  # change this to 1e4 for final calibration
+  par     = list(
+    exp_et  = list(lower=0.01, upper=0.5, init = 0.06),
+    beta_et = list(lower=0.1,  upper=1.0, init = 0.66),
+    rwsc    = list(lower=10,   upper=1000, init = 200)
+    )
+)
+```
+
+Run calibration.
+```{r}
+pars <- calib_sofun(
+    drivers = df_drivers2 |> 
+      filter(sitename == "AT-Neu"),  
+    obs = df_obs |> 
+      mutate(le = le*24*60*60) |> 
+      group_by(sitename) |> 
+      nest() |> 
+      filter(sitename == "AT-Neu"),
+    settings = settings
+  )
+```
+
+Run model with optimized parameters.
+```{r}
+params_modl <- list(
+    kphio           = 0.09423773,
+    soilm_par_a     = 0.33349283,
+    soilm_par_b     = 1.45602286,
+    tau_acclim_tempstress = 10,
+    par_shape_tempstress  = 0.0,
+    exp_et = pars$par[["exp_et"]],
+    beta_et = pars$par[["beta_et"]],
+    rwsc = pars$par[["rwsc"]]
+  )
+
+# run the model for these parameters
+output <- runread_pmodel_f(
+  df_drivers2 |> 
+    filter(sitename == "AT-Neu"),
+  par = params_modl
+  )
+```
+
+Visualize modeled vs observed.
+```{r}
+tmp <- df_obs |> 
+  filter(sitename == "AT-Neu") |> 
+  left_join(
+    output$data[[1]],
+    by = "date"
+  ) |> 
+  mutate(latenth = latenth / (24 * 60 * 60) ) |> 
+  left_join(
+    df_fluxnet |> 
+      filter(sitename == "AT-Neu") |> 
+      unnest(data) |> 
+      select(date, starts_with("SWC_")),
+    by = c("sitename", "date")
+  )
+
+out <- tmp |> 
+  rbeni::analyse_modobs2("latenth", "LE_F_MDS")
+out$gg
+```
