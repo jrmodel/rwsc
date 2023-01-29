@@ -31,7 +31,7 @@ pars$par["kphio"] <- 0.05
 
 Check whether sufficient sites have net radiation data.
 ```{r}
-filnam <- "./data/df_fluxnet.rds"
+filnam <- "F:/master thesis/data/df_fluxnet.rds"
 if (!file.exists(filnam)){
   df_fluxnet <- ingest(
     siteinfo  = ingestr::siteinfo_fluxnet2015,
@@ -149,7 +149,7 @@ p_model_drivers$params_siml[[1]]$in_netrad <- TRUE
 
 Get the FLUXNET 2015 forcing data from sofunCalVal.
 ```{r}
-load("~/sofunCalVal/data/df_drivers_fluxnet2015_allsites.rda")  # loads 'df_drivers_fluxnet2015_allsites'
+load("F:/sofunCalVal_jr/data/df_drivers_fluxnet2015_allsites.rda")  # loads 'df_drivers_fluxnet2015_allsites'
 ```
 
 Subset sites.
@@ -186,7 +186,7 @@ Adapted from https://github.com/computationales/sofunCalVal/blob/main/analysis/0
 
 Get data from FluxDataKit (downloaded from Zenodo to `~/data/flux_data_kit_beta/fluxes/`)
 ```{r}
-filnam <- "./data/df_fdk.rds"
+filnam <- "F:/master thesis/data/df_fdk.rds"
 
 if (!file.exists(filnam)){
   # # create CSV files with daily data
@@ -287,7 +287,7 @@ params_modl <- list(
 # for a single site
 output <- runread_pmodel_f(
   df_drivers2 |> 
-    filter(sitename == "AT-Neu"),
+    filter(sitename == "FR-Pue"),
   par = params_modl
   )
 ```
@@ -297,7 +297,7 @@ output <- runread_pmodel_f(
 Plot modelled and observed net radiation
 ```{r}
 df_drivers2 |> 
-  filter(sitename == "AT-Neu") |> 
+  filter(sitename == "FR-Pue") |> 
   unnest(forcing) |> 
   select(date, netrad_obs = netrad) |> 
   left_join(
@@ -305,8 +305,9 @@ df_drivers2 |>
     by = "date"
   ) |> 
   ggplot() +
-  geom_line(aes(date, netrad_obs)) +
-  geom_line(aes(date, netrad/(24*60*60)), color = "red")
+  geom_line(aes(date, netrad_obs), color = "red") 
+# +
+#   geom_line(aes(date, netrad/(24*60*60)), color = "red")
 ```
 
 Plot modelled PET and AET
@@ -320,7 +321,7 @@ output$data[[1]] |>
 Plot observed LE.
 ```{r}
 tmp <- df_obs |> 
-  filter(sitename == "AT-Neu") |> 
+  filter(sitename == "FR-Pue") |> 
   left_join(
     output$data[[1]],
     by = "date"
@@ -328,7 +329,7 @@ tmp <- df_obs |>
   mutate(latenth = latenth / (24 * 60 * 60) ) |> 
   left_join(
     df_fluxnet |> 
-      filter(sitename == "AT-Neu") |> 
+      filter(sitename == "FR-Pue") |> 
       unnest(data) |> 
       select(date, starts_with("SWC_")),
     by = c("sitename", "date")
@@ -382,12 +383,12 @@ Run calibration.
 ```{r}
 pars <- calib_sofun(
     drivers = df_drivers2 |> 
-      filter(sitename == "AT-Neu"),  
+      filter(sitename == "FR-Pue"),  
     obs = df_obs |> 
       mutate(le = le*24*60*60) |> 
       group_by(sitename) |> 
       nest() |> 
-      filter(sitename == "AT-Neu"),
+      filter(sitename == "FR-Pue"),
     settings = settings
   )
 ```
@@ -408,9 +409,32 @@ params_modl <- list(
 # run the model for these parameters
 output <- runread_pmodel_f(
   df_drivers2 |> 
-    filter(sitename == "AT-Neu"),
+    filter(sitename == "FR-Pue"),
   par = params_modl
   )
+```
+```{r}
+tmp <- df_obs |> 
+  filter(sitename == "FR-Pue") |> 
+  left_join(
+    output$data[[1]],
+    by = "date"
+  ) |> 
+  mutate(latenth = latenth / (24 * 60 * 60) ) |> 
+  left_join(
+    df_fluxnet |> 
+      filter(sitename == "FR-Pue") |> 
+      unnest(data) |> 
+      select(date, starts_with("SWC_")),
+    by = c("sitename", "date")
+  )
+
+
+# visulize it 
+tmp |> 
+  ggplot() +
+  geom_line(aes(date, latenth), color = "red") +
+  geom_point(aes(date, LE_F_MDS))
 ```
 
 Visualize modeled vs observed.
@@ -430,7 +454,7 @@ tmp <- df_obs |>
     by = c("sitename", "date")
   )
 
-out <- tmp |> 
-  rbeni::analyse_modobs2("latenth", "LE_F_MDS")
-out$gg
+# out <- tmp |> 
+#   rbeni::analyse_modobs2("latenth", "LE_F_MDS")
+# out$gg
 ```

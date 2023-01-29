@@ -1,0 +1,91 @@
+---
+title: "multisite_calib"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(rsofun)
+
+load("F:/rwsc/driver.Rda")
+load("F:/rwsc/obs.Rda")
+load("F:/rwsc/settings.Rda")
+
+```
+
+## R Markdown
+
+# calibration settings
+
+```{r cars}
+sitenames <- df_drivers2$sitename
+# Fill first row of nested input
+input <- tibble(drivers = df_drivers2 |>
+                  filter(sitename == sitenames[1]) |>
+                  list(),
+                obs = obs_3 |>
+                  filter(sitename == sitenames[1]) |>
+                  list(),
+                settings = settings |>
+                  list())
+for(s in sitenames[-1]){
+  input <- input |>
+    add_row(drivers = df_drivers2 |>
+              filter(sitename == s) |>
+              list(),
+            obs = obs_3 |>
+              filter(sitename == s) |>
+              list(),
+            settings = settings |>
+              list()
+    )
+}
+```
+
+## start calibration
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+params <- apply(input, 1, 
+                function(x) calib_sofun(x$drivers, x$obs, x$settings))
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+##reformate new parameter lists
+```{r}
+sitenames <- df_drivers2$sitename
+params_modl <- list()
+for (s in 1 : length((sitenames))){
+  p = list(
+    kphio           = 0.09423773,
+    soilm_par_a     = 0.33349283,
+    soilm_par_b     = 1.45602286,
+    tau_acclim_tempstress = 10,
+    par_shape_tempstress  = 0.0,
+    exp_et = params[[s]]$par[["exp_et"]],
+    beta_et = params[[s]]$par[["beta_et"]],
+    rwsc = params[[s]]$par[["rwsc"]]
+  )
+  params_modl[[s]]<-p
+  
+}
+
+
+Visualize <- tibble(drivers = df_drivers2 |>
+                  filter(sitename == sitenames[1]) |>
+                  list(),
+                  params2 = params_modl 
+                                    )
+                
+for(s in 2:length(sitenames)){
+  Visualize$drivers[[s]] <-df_drivers2[s,]
+}
+
+## run the model for these new parameters
+output_n <- apply(Visualize, 1, 
+                function(x) runread_pmodel_f(x$drivers, x$params2))
+
+```
+
