@@ -10,7 +10,7 @@ library(rsofun)
 library(ggplot2)
 library(patchwork)
 
-load("F:/rwsc/driver.Rda")
+# load("F:/rwsc/driver.Rda")
 load("F:/rwsc/obs.Rda")
 # load("F:/rwsc/settings.Rda")
 # load("F:/rwsc/params_d.Rda")
@@ -22,9 +22,9 @@ load("F:/rwsc/params.Rda")
 # calibration settings
 
 ```{r cars}
-sitename <- df_drivers2$sitename
+sitenames <- df_drivers3$sitename
 # Fill first row of nested input
-input <- tibble(drivers = df_drivers2 |>
+input <- tibble(drivers = df_drivers3 |>
                   filter(sitename == sitenames[1]) |>
                   list(),
                 obs = obs_3 |>
@@ -34,7 +34,7 @@ input <- tibble(drivers = df_drivers2 |>
                   list())
 for(s in sitenames[-1]){
   input <- input |>
-    add_row(drivers = df_drivers2 |>
+    add_row(drivers = df_drivers3 |>
               filter(sitename == s) |>
               list(),
             obs = obs_3 |>

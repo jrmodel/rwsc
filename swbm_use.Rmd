@@ -14,7 +14,7 @@ library(dplyr)
 library(ggplot2)
 library(tidyr)
 library(recipes)
-library(FluxDataKit)
+# library(FluxDataKit)
 library(readr)
 library(stringr)
 
@@ -383,12 +383,12 @@ Run calibration.
 ```{r}
 pars <- calib_sofun(
     drivers = df_drivers2 |> 
-      filter(sitename == "FR-Pue"),  
+      filter(sitename == "US-Wkg"),  
     obs = df_obs |> 
       mutate(le = le*24*60*60) |> 
       group_by(sitename) |> 
       nest() |> 
-      filter(sitename == "FR-Pue"),
+      filter(sitename == "US-Wkg"),
     settings = settings
   )
 ```

@@ -12,11 +12,12 @@ knitr::opts_chunk$set(
 library(rsofun)
 library(dplyr)
 library(ggplot2)
-library(tidyr)
+# library(tidyr)
 library(recipes)
 # library(FluxDataKit)
 library(readr)
 library(stringr)
+library(tidyverse)
 
 source("R/fill_missing_netrad.R")
 
@@ -349,6 +350,8 @@ tmp |>
   ggplot() +
   geom_line(aes(date, latenth), color = "red") +
   geom_point(aes(date, LE_F_MDS))
+
+
 ```
 
 Plot soil moisture.
@@ -378,9 +381,9 @@ settings <- list(
   metric  = cost_mae_swbm,
   control = list(max.call = 1e3),  # change this to 1e4 for final calibration
   par     = list(
-    exp_et  = list(lower=0.01, upper=0.5, init = 0.06),
-    beta_et = list(lower=0.1,  upper=1.0, init = 0.66),
-    rwsc    = list(lower=10,   upper=1000, init = 200)
+    exp_et  = list(lower=0.02, upper=1.5, init = 0.06),
+    beta_et = list(lower=0.03,  upper=1.0, init = 0.6),
+    rwsc    = list(lower=20,   upper=1000, init = 200)
     )
 )
 ```
@@ -389,12 +392,12 @@ Run calibration.
 ```{r}
 pars <- calib_sofun(
     drivers = df_drivers2 |> 
-      filter(sitename == "FR-Pue"),  
+      filter(sitename == "US-NR1"),  
     obs = df_obs |> 
       mutate(le = le*24*60*60) |> 
       group_by(sitename) |> 
       nest() |> 
-      filter(sitename == "FR-Pue"),
+      filter(sitename == "US-NR1"),
     settings = settings
   )
 ```
@@ -415,13 +418,13 @@ params_modl <- list(
 # run the model for these parameters
 output <- runread_pmodel_f(
   df_drivers2 |> 
-    filter(sitename == "FR-Pue"),
+    filter(sitename == "FR-LBr"),
   par = params_modl
   )
 ```
 ```{r}
 tmp <- df_obs |> 
-  filter(sitename == "FR-Pue") |> 
+  filter(sitename == "FR-LBr") |> 
   left_join(
     output$data[[1]],
     by = "date"
@@ -429,7 +432,7 @@ tmp <- df_obs |>
   mutate(latenth = latenth / (24 * 60 * 60) ) |> 
   left_join(
     df_fluxnet |> 
-      filter(sitename == "FR-Pue") |> 
+      filter(sitename == "FR-LBr") |> 
       unnest(data) |> 
       select(date, starts_with("SWC_")),
     by = c("sitename", "date")
@@ -446,7 +449,7 @@ tmp |>
 Visualize modeled vs observed.
 ```{r}
 tmp <- df_obs |> 
-  filter(sitename == "AT-Neu") |> 
+  filter(sitename == "FR-LBr") |> 
   left_join(
     output$data[[1]],
     by = "date"
@@ -460,7 +463,7 @@ tmp <- df_obs |>
     by = c("sitename", "date")
   )
 
-# out <- tmp |> 
-#   rbeni::analyse_modobs2("latenth", "LE_F_MDS")
-# out$gg
+out <- tmp |>
+  rbeni::analyse_modobs2("latenth", "LE_F_MDS")
+out$gg
 ```
