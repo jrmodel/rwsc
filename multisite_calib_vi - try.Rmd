@@ -10,11 +10,11 @@ library(rsofun)
 library(ggplot2)
 library(patchwork)
 
-# load("F:/rwsc/driver.Rda")
+ load("F:/rwsc/driver.Rda")
 load("F:/rwsc/obs.Rda")
 # load("F:/rwsc/settings.Rda")
 # load("F:/rwsc/params_d.Rda")
-load("F:/rwsc/params.Rda")
+# load("F:/rwsc/params.Rda")
 ```
 
 ## R Markdown
@@ -22,9 +22,9 @@ load("F:/rwsc/params.Rda")
 # calibration settings
 
 ```{r cars}
-sitenames <- df_drivers3$sitename
+sitenames <- df_drivers2$sitename
 # Fill first row of nested input
-input <- tibble(drivers = df_drivers3 |>
+input <- tibble(drivers = df_drivers2 |>
                   filter(sitename == sitenames[1]) |>
                   list(),
                 obs = obs_3 |>
@@ -32,9 +32,9 @@ input <- tibble(drivers = df_drivers3 |>
                   list(),
                 settings = settings |>
                   list())
-for(s in sitenames[-1]){
+for(s in  sitenames[-1]){
   input <- input |>
-    add_row(drivers = df_drivers3 |>
+    add_row(drivers = df_drivers2 |>
               filter(sitename == s) |>
               list(),
             obs = obs_3 |>
@@ -62,10 +62,10 @@ sitenames <- df_drivers2$sitename
 params_modl <- list()
 for (s in 1 : length((sitenames))){
   p = list(
-    kphio           = 0.09423773,
-    soilm_par_a     = 0.33349283,
-    soilm_par_b     = 1.45602286,
-    tau_acclim_tempstress = 10,
+    kphio           = 0.08718,
+    soilm_par_a     = 0.0,
+    soilm_par_b     = 0.9,
+    tau_acclim_tempstress = 20,
     par_shape_tempstress  = 0.0,
     exp_et = params[[s]]$par[["exp_et"]],
     beta_et = params[[s]]$par[["beta_et"]],
@@ -80,7 +80,7 @@ params_d <- tibble(
   sitename = sitenames[1],
   exp_et   = params_modl[[1]]$exp_et,
   beta_et  =params_modl[[1]]$beta_et,
-  rwsc   = params_modl[[1]]$rwsc,
+  rwsc   = params_modl[[1]]$rwsc
 )
 
 for(s in 2 : length(sitenames)){
@@ -136,4 +136,12 @@ for(s in 1: length(sitenames)){
 }
 ```
 
+```{r}
+alldata1 <- alldata
+for (t in 2:13){
+  alldata1[t,]$data[[1]]<-alldata1[t,]$data[[1]]|>
+    rename(Modelled_LE = latenth)|>
+    rename(Observed_LE = le)
+}
+```
 

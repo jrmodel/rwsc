@@ -15,7 +15,7 @@ for(s in 2 : length(sitenames)){
 
 
 params_s  <- tibble(
-  sitename = sitenames[1],
+  sitename = sitename[1],
   exp_et   = params_d[1,]$exp_et,
   beta_et  =params_d[1,]$beta_et,
   rwsc   = params_d[1,]$rwsc,

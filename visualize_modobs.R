@@ -1,3 +1,4 @@
+library(ggpubr)
 
 
 a <- list()
@@ -43,6 +44,25 @@ for (i in 1:13){
 }
 
 
+b <- list()
+for (i in 1:13){
+  tmp <- alldata1[i,]$data[[1]]
+  out <- tmp |>
+    rbeni::analyse_modobs2("Modelled_LE", "Observed_LE")
+  b <- append(b, list(out))
+  
+}
+
+ggarrange(ggarrange(b[[1]]$gg,b[[2]]$gg, b[[3]]$gg, ncol =3,labels=c("AT-Neu", "AU-Das","DE-Hai"), label.x = 0.1, label.y= 0.85),
+          ggarrange(b[[4]]$gg,b[[5]]$gg, b[[6]]$gg, ncol=3,labels=c("DE-Tha", "FR-LBr","FR-Pue"), label.x = 0.1, label.y= 0.85),
+          ggarrange(b[[7]]$gg,b[[8]]$gg, b[[9]]$gg, ncol=3,labels=c("GF-Guy", "NL-Loo","US-Me2"),label.x = 0.1, label.y= 0.85),
+          # ggarrange(a[[10]]$gg,a[[11]]$gg,ncol=2,labels=c("(j)", "(k)")),
+          # ggarrange(a[[12]]$gg, a[[13]]$gg,ncol=2,labels=c("(l)","(m)")),
+          nrow =3)
+
+ggarrange(ggarrange(b[[10]]$gg,b[[11]]$gg, ncol =2,labels=c("US-NR1", "US-SRM"), label.x = 0.1, label.y= 0.85),
+          ggarrange(b[[12]]$gg,b[[13]]$gg, ncol=2,labels=c("US-Ton", "US-Wkg"), label.x = 0.1, label.y= 0.85),
+          nrow =2)
 
 
             

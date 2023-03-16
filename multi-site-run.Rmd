@@ -14,7 +14,7 @@ load("F:/rwsc/driver.Rda")
 load("F:/rwsc/obs.Rda")
 # load("F:/rwsc/settings.Rda")
 # load("F:/rwsc/params_d.Rda")
-load("F:/rwsc/params.Rda")
+# load("F:/rwsc/params.Rda")
 ```
 
 ## R Markdown
@@ -23,11 +23,17 @@ load("F:/rwsc/params.Rda")
 
 ```{r cars}
 sitenames <- df_drivers2$sitename
+obs_4 <- obs_3
+for (s in 1 : length(sitenames)){
+    Selected <- sample.int(nrow(obs_4[[2]][[s]])          ,365*floor(0.5*df_drivers2[1,]$params_siml[[1]]$nyeartrend))
+    obs_4[[2]][[s]][-Selected,]$le <- NA
+    
+}
 # Fill first row of nested input
 input <- tibble(drivers = df_drivers2 |>
                   filter(sitename == sitenames[1]) |>
                   list(),
-                obs = obs_3 |>
+                obs = obs_4 |>
                   filter(sitename == sitenames[1]) |>
                   list(),
                 settings = settings |>
@@ -37,7 +43,7 @@ for(s in sitenames[-1]){
     add_row(drivers = df_drivers2 |>
               filter(sitename == s) |>
               list(),
-            obs = obs_3 |>
+            obs = obs_4 |>
               filter(sitename == s) |>
               list(),
             settings = settings |>
@@ -62,9 +68,9 @@ sitenames <- df_drivers2$sitename
 params_modl <- list()
 for (s in 1 : length((sitenames))){
   p = list(
-    kphio           = 0.09423773,
-    soilm_par_a     = 0.33349283,
-    soilm_par_b     = 1.45602286,
+    kphio           =  0.08718,
+    soilm_par_a     = 0.0,
+    soilm_par_b     = 0.73300,
     tau_acclim_tempstress = 10,
     par_shape_tempstress  = 0.0,
     exp_et = params[[s]]$par[["exp_et"]],
@@ -134,6 +140,50 @@ for(s in 1: length(sitenames)){
     left_join(m,by="date")|>
     mutate(le = le/24/60/60)
 }
+```
+
+```{r}
+sitenames <- df_drivers2$sitename
+obs_4 <- obs_3
+
+Selected <- sample.int(nrow(obs_4[[2]][[12]]), 365*5)
+obs_4[[2]][[12]][-Selected,]$le <- NA
+
+source("R/cost_mae_swbm.R")
+
+settings <- list(
+  method  = "gensa",
+  metric  = cost_mae_swbm,
+  control = list(max.call = 1e3),  # change this to 1e4 for final calibration
+  par     = list(
+    exp_et  = list(lower=0.01, upper=1.5, init = 0.03),
+    beta_et = list(lower=0.03,  upper=1.0, init = 0.6),
+    rwsc    = list(lower=20,   upper=1000, init = 200)
+    )
+)
+
+
+
+pars <- calib_sofun(
+    drivers = df_drivers2 |> 
+      filter(sitename == "US-Ton"),  
+    obs = obs_4[12,],
+    settings = settings
+  )
+```
+```
+
+
+```{r}
+pars <- calib_sofun(
+    drivers = df_drivers2,  
+    obs = df_obs |> 
+      mutate(le = le*24*60*60) |> 
+      group_by(sitename) |> 
+      nest(),
+    settings = settings
+  )
+
 ```
 
 

@@ -1,0 +1,113 @@
+---
+title: "one_site_10_time"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(rsofun)
+library(ggplot2)
+library(patchwork)
+
+load("F:/rwsc/driver.Rda")
+load("F:/rwsc/obs.Rda")
+# load("F:/rwsc/settings.Rda")
+# load("F:/rwsc/params_d.Rda")
+# load("F:/rwsc/params.Rda")
+
+source("F:/rwsc/R/cost_mae_swbm.R")
+
+settings <- list(
+  method  = "gensa",
+  metric  = cost_mae_swbm,
+  control = list(max.call = 1e4),  # change this to 1e4 for final calibration
+  par     = list(
+    exp_et  = list(lower=0.01, upper=1.5, init = 0.03),
+    beta_et = list(lower=0.03,  upper=1.0, init = 0.6),
+    rwsc    = list(lower=20,   upper=1000, init = 200)
+    )
+)
+
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+timestart<-Sys.time()
+
+sitenames <- df_drivers2$sitename
+obs_4 <- obs_3
+
+Selected <- sample.int(nrow(obs_4[[2]][[11]]),floor(365*0.333*df_drivers2[11,]$params_siml[[1]]$nyeartrend))
+obs_4[[2]][[11]][-Selected,]$le <- NA
+
+
+pars <- calib_sofun(
+    drivers = df_drivers2[11,],  
+    obs = obs_4,
+    settings = settings
+  )
+c_SRM<-tibble()
+c_SRM<- tibble(
+  sitename = sitenames[[11]],
+  exp_et   = pars$par[[1]],
+  beta_et  = pars$par[[2]],
+  rwsc     = pars$par[[3]]
+)
+for ( i in 1:9){
+  obs_4 <- obs_3
+Selected <- sample.int(nrow(obs_4[[2]][[11]]),floor(365*0.333*df_drivers2[11,]$params_siml[[1]]$nyeartrend))
+obs_4[[2]][[11]][-Selected,]$le <- NA
+
+pars <- calib_sofun(
+    drivers = df_drivers2[11,],  
+    obs = obs_4,
+    settings = settings
+  ) 
+
+  c_SRM<- c_SRM |>
+    add_row(sitename = sitenames[11],
+            exp_et   = pars$par[[1]],
+            beta_et  =pars$par[[2]],
+            rwsc     =  pars$par[[3]])
+}
+
+
+timeend<-Sys.time()
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+
+for ( i in 1:9){
+  obs_4 <- obs_3
+Selected <- sample.int(nrow(obs_4[[2]][[11]]),floor(365*0.5*df_drivers2[11,]$params_siml[[1]]$nyeartrend))
+obs_4[[2]][[11]][-Selected,]$le <- NA
+
+pars <- calib_sofun(
+    drivers = df_drivers2[11,],  
+    obs = obs_4,
+    settings = settings
+  ) 
+
+  c_SRM<- c_SRM |>
+    add_row(sitename = sitenames[11],
+            exp_et   = pars$par[[1]],
+            beta_et  =pars$par[[2]],
+            rwsc     =  pars$par[[3]])
+}
+
+
+timeend<-Sys.time()
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

@@ -1,0 +1,81 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+settings <- list(
+  method  = "gensa",
+  metric  = cost_mae_swbm,
+  control = list(max.call = 1e4),  # change this to 1e4 for final calibration
+  par     = list(
+    exp_et  = list(lower=0.01, upper=1.5, init = 0.03),
+    beta_et = list(lower=0.03,  upper=1.0, init = 0.6),
+    rwsc    = list(lower=15,   upper=1000, init = 200)
+    )
+)
+
+pars <- calib_sofun(
+  drivers = df_drivers2 |> 
+    filter(sitename == "NL-Loo"),  
+  obs = obs_3,
+  settings = settings
+)
+
+```
+
+## R Markdown
+
+`This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+params_modl <- list(
+    kphio           = 0.09423773,
+    soilm_par_a     = 0.33349283,
+    soilm_par_b     = 1.45602286,
+    tau_acclim_tempstress = 10,
+    par_shape_tempstress  = 0.0,
+    exp_et = pars$par[["exp_et"]],
+    beta_et = pars$par[["beta_et"]],
+    rwsc = pars$par[["rwsc"]]
+  )
+
+output <- runread_pmodel_f(
+  df_drivers2 |> 
+    filter(sitename == "NL-Loo"),
+  par = params_modl
+  )
+
+tmp <- df_obs |> 
+  filter(sitename == "FR-LBr") |> 
+  left_join(
+    output$data[[1]],
+    by = "date"
+  ) |> 
+  mutate(latenth = latenth / (24 * 60 * 60) ) |> 
+  left_join(
+    df_fluxnet |> 
+      filter(sitename == "FR-LBr") |> 
+      unnest(data) |> 
+      select(date, starts_with("SWC_")),
+    by = c("sitename", "date")
+  )
+
+
+# visulize it 
+tmp |> 
+  ggplot() +
+  geom_line(aes(date, latenth), color = "red") +
+  geom_point(aes(date, LE_F_MDS))
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

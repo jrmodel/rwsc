@@ -381,9 +381,9 @@ settings <- list(
   metric  = cost_mae_swbm,
   control = list(max.call = 1e3),  # change this to 1e4 for final calibration
   par     = list(
-    exp_et  = list(lower=0.02, upper=1.5, init = 0.06),
+    exp_et  = list(lower=0.01, upper=1.5, init = 0.03),
     beta_et = list(lower=0.03,  upper=1.0, init = 0.6),
-    rwsc    = list(lower=20,   upper=1000, init = 200)
+    rwsc    = list(lower=15,   upper=1000, init = 200)
     )
 )
 ```
