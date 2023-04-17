@@ -1,0 +1,84 @@
+---
+title: "aridity index"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(rsofun)
+library(dplyr)
+library(ggplot2)
+# library(tidyr)
+library(recipes)
+# library(FluxDataKit)
+library(readr)
+library(stringr)
+library(ggpubr)
+
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+ load("F:/rwsc/driver.Rda")
+load("F:/rwsc/obs.Rda")
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+sitenames <- df_drivers2$sitename
+p <- tibble(
+  sitename = sitenames[1],
+  prec   = sum(df_drivers2$forcing[[1]]$rain),
+  PET  =sum(output_t$modelled_data[[1]]$pet),
+  AI   = 100000*prec/PET
+)
+
+for(s in 2 : length(sitenames)){
+  p <-p |>
+    add_row(sitename = sitenames[s],
+            prec   = sum(df_drivers2$forcing[[s]]$rain),
+            PET  =sum(output_t$modelled_data[[s]]$pet),
+            AI   = 100000*prec/PET)
+}
+
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+```{r}
+PET <- sum(output_t$modelled_data[[7]]$pet)
+prec   = sum(df_drivers2$forcing[[7]]$rain)
+PET
+prec
+prec *1000/PET
+```
+```{r}
+a <- ggplot()+
+                   geom_point(aes(AI_new$sitename, AI_new$rwsc))+
+                    labs(x="Sitename", y= "Smax (mm)", tag= "(a)")+
+  theme_grey(base_size =12)
+
+b <- ggplot()+
+                   geom_point(aes(AI_new$sitename, AI_new$exp_et), color = "blue")+
+                    labs(x="Sitename", y= "γ", tag = "(b)")+
+  theme_grey(base_size = 12)
+
+c <- ggplot()+
+                   geom_point(aes(AI_new$sitename, AI_new$beta_et),  color = "red")+
+                    labs(x="Sitename", y= expression(β[0]), tag = "(c)")+
+  theme_grey(base_size = 12)
+
+ggarrange(a, b, c, nrow=3, ncol=1)
+
+
+```
+

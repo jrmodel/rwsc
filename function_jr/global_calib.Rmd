@@ -1,0 +1,81 @@
+---
+title: "global_application"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tibble)
+library(rsofun)
+library(tidyverse)
+load("F:/rwsc/midterm data/par_global_4.RDA")
+load("F:/rwsc/driver.Rda")
+load("F:/rwsc/obs.Rda")
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+
+```
+
+Run model with optimized parameters.
+```{r}
+params_modl <- list(
+    kphio           = 0.08718,
+    soilm_par_a     = 0.0,
+    soilm_par_b     = 0.73300,
+    tau_acclim_tempstress = 10,
+    par_shape_tempstress  = 0.0,
+    exp_et = pars$par[["exp_et"]],
+    beta_et = pars$par[["beta_et"]],
+    rwsc = pars$par[["rwsc"]]
+  )
+
+df_drivers3 <- tibble(df_drivers2)
+# run the model for these parameters
+output <- runread_pmodel_f(
+  df_drivers3,
+  par = params_modl
+  )
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+output <- output |>
+  rename(modelled_data = data)
+
+sitenames <- df_drivers2$sitename
+
+alldata <- obs_3|>
+  left_join(output, by ="sitename")
+# combine modelled data and observational data 
+for(s in 1: length(sitenames)){
+  m <- output[s,]$modelled_data[[1]]|>
+     select(date, latenth)|>
+     mutate(latenth = latenth/24/60/60)
+  
+  alldata[s,]$data[[1]] <- alldata[s,]$data[[1]]|>
+    left_join(m,by="date")|>
+    mutate(le = le/24/60/60)
+}
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+```{r}
+alldata1 <- alldata 
+for (t in 1:13){
+  alldata1[t,]$data[[1]]<-alldata1[t,]$data[[1]]|>
+    rename(Modelled_LE = latenth)|>
+    rename(Observed_LE = le)
+}
+```
+

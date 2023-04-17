@@ -12,6 +12,7 @@ library(patchwork)
 
  load("F:/rwsc/driver.Rda")
 load("F:/rwsc/obs.Rda")
+load("F:/rwsc/site_data/0.3/params_4.RDA")
 # load("F:/rwsc/settings.Rda")
 # load("F:/rwsc/params_d.Rda")
 # load("F:/rwsc/params.Rda")
@@ -63,9 +64,9 @@ params_modl <- list()
 for (s in 1 : length((sitenames))){
   p = list(
     kphio           = 0.08718,
-    soilm_par_a     = 0.0,
-    soilm_par_b     = 0.9,
-    tau_acclim_tempstress = 20,
+    soilm_par_a     = 0,
+    soilm_par_b     = 0.73300,
+    tau_acclim_tempstress = 10,
     par_shape_tempstress  = 0.0,
     exp_et = params[[s]]$par[["exp_et"]],
     beta_et = params[[s]]$par[["beta_et"]],
@@ -137,11 +138,14 @@ for(s in 1: length(sitenames)){
 ```
 
 ```{r}
-alldata1 <- alldata
-for (t in 2:13){
+alldata1 <- alldata 
+for (t in 1:13){
   alldata1[t,]$data[[1]]<-alldata1[t,]$data[[1]]|>
     rename(Modelled_LE = latenth)|>
     rename(Observed_LE = le)
 }
+
+
+
 ```
 
